@@ -272,41 +272,137 @@ class ISBNScanner {
     }
 
     extractISBN(text) {
-        // Clean up text
-        const cleanText = text.replace(/[^0-9Xx\s\-]/g, ' ');
+        console.log('Raw OCR text:', text);
         
-        // ISBN-13 pattern (with or without hyphens)
-        const isbn13Pattern = /(?:978|979)[\s\-]?\d[\s\-]?\d{2}[\s\-]?\d{5}[\s\-]?\d/g;
-        const isbn13Matches = cleanText.match(isbn13Pattern);
+        // Normalize the text - keep original for pattern matching
+        const normalizedText = text
+            .toUpperCase()
+            .replace(/[Il|]/g, '1')      // Common OCR mistakes: I, l, | -> 1
+            .replace(/[Oo]/g, '0')        // O -> 0 in number context
+            .replace(/[Ss]/g, '5')        // S -> 5 in number context  
+            .replace(/[Bb]/g, '8')        // B -> 8 in number context
+            .replace(/[Zz]/g, '2')        // Z -> 2 in number context
+            .replace(/\n/g, ' ');         // Newlines to spaces
         
-        if (isbn13Matches) {
-            const isbn = isbn13Matches[0].replace(/[\s\-]/g, '');
-            if (this.isValidISBN(isbn)) {
-                return isbn;
-            }
-        }
+        // Strategy 1: Look for "ISBN" keyword followed by numbers
+        const isbnLabelPatterns = [
+            /ISBN[-:\s]*(?:13)?[-:\s]*((?:97[89])[-\s.\d]{10,17})/gi,
+            /ISBN[-:\s]*(?:10)?[-:\s]*(\d[-\s.\d]{9,12}[X\d])/gi,
+            /ISBN\s*[:=]?\s*(\d[\d\s\-\.]{9,16}[\dX])/gi
+        ];
         
-        // ISBN-10 pattern
-        const isbn10Pattern = /\d[\s\-]?\d{2}[\s\-]?\d{5}[\s\-]?[\dXx]/g;
-        const isbn10Matches = cleanText.match(isbn10Pattern);
-        
-        if (isbn10Matches) {
-            const isbn = isbn10Matches[0].replace(/[\s\-]/g, '').toUpperCase();
-            if (this.isValidISBN10(isbn)) {
-                return isbn;
-            }
-        }
-        
-        // Simple 13 or 10 digit number search
-        const numbers = cleanText.match(/\d{10,13}/g);
-        if (numbers) {
-            for (const num of numbers) {
-                if (this.isValidISBN(num)) {
-                    return num;
+        for (const pattern of isbnLabelPatterns) {
+            const matches = text.matchAll(pattern);
+            for (const match of matches) {
+                const candidate = match[1].replace(/[\s\-\.]/g, '');
+                console.log('ISBN label match candidate:', candidate);
+                if (candidate.length === 13 && this.validateISBN13(candidate)) {
+                    return candidate;
+                }
+                if (candidate.length === 10 && this.isValidISBN10(candidate)) {
+                    return candidate;
                 }
             }
         }
         
+        // Strategy 2: Look for 978/979 prefix (ISBN-13)
+        // Handle cases where digits might be stuck to other text
+        const isbn13Patterns = [
+            // Standard with possible separators
+            /(97[89])[-\s.]?(\d)[-\s.]?(\d{2})[-\s.]?(\d{5})[-\s.]?(\d)/g,
+            // Compact - 13 digits starting with 978/979
+            /(97[89]\d{10})/g,
+            // With text around it - extract 978/979 followed by 10 more digits
+            /(?:^|[^\d])(97[89])(\d{10})(?:[^\d]|$)/g,
+            // Broken by OCR - might have spaces/chars between
+            /(97[89])[\s\-\.oO]*(\d)[\s\-\.oO]*(\d)[\s\-\.oO]*(\d)[\s\-\.oO]*(\d)[\s\-\.oO]*(\d)[\s\-\.oO]*(\d)[\s\-\.oO]*(\d)[\s\-\.oO]*(\d)[\s\-\.oO]*(\d)[\s\-\.oO]*(\d)/g
+        ];
+        
+        for (const pattern of isbn13Patterns) {
+            const matches = normalizedText.matchAll(pattern);
+            for (const match of matches) {
+                // Join all capture groups and clean
+                const candidate = match.slice(1).join('').replace(/[\s\-\.]/g, '');
+                const digits = candidate.replace(/[^\d]/g, '');
+                console.log('ISBN-13 pattern candidate:', digits);
+                if (digits.length === 13 && this.validateISBN13(digits)) {
+                    return digits;
+                }
+            }
+        }
+        
+        // Strategy 3: Find any sequence of 13 digits that validates as ISBN-13
+        const allDigitSequences = normalizedText.replace(/[^\d\s]/g, ' ').match(/\d[\d\s]{11,20}\d/g) || [];
+        for (const seq of allDigitSequences) {
+            const digits = seq.replace(/\s/g, '');
+            if (digits.length >= 13) {
+                // Try to find a valid ISBN-13 within
+                for (let i = 0; i <= digits.length - 13; i++) {
+                    const candidate = digits.substring(i, i + 13);
+                    if ((candidate.startsWith('978') || candidate.startsWith('979')) && this.validateISBN13(candidate)) {
+                        console.log('Found ISBN-13 in sequence:', candidate);
+                        return candidate;
+                    }
+                }
+            }
+        }
+        
+        // Strategy 4: ISBN-10 (10 digits, last can be X)
+        const isbn10Patterns = [
+            /(\d)[-\s.]?(\d{2})[-\s.]?(\d{5})[-\s.]?([\dX])/gi,
+            /(\d{9}[\dX])/gi,
+            /(?:^|[^\dX])(\d{9})([\dX])(?:[^\dX]|$)/gi
+        ];
+        
+        for (const pattern of isbn10Patterns) {
+            const matches = text.toUpperCase().matchAll(pattern);
+            for (const match of matches) {
+                const candidate = match.slice(1).join('').replace(/[\s\-\.]/g, '').toUpperCase();
+                const clean = candidate.replace(/[^\dX]/g, '');
+                console.log('ISBN-10 pattern candidate:', clean);
+                if (clean.length === 10 && this.isValidISBN10(clean)) {
+                    return clean;
+                }
+            }
+        }
+        
+        // Strategy 5: Brute force - find any 10 or 13 digit number and validate
+        const allNumbers = text.match(/\d+/g) || [];
+        // Also try concatenating adjacent numbers
+        const concatenated = allNumbers.join('');
+        
+        // Look for ISBN-13 in concatenated
+        for (let i = 0; i <= concatenated.length - 13; i++) {
+            const candidate = concatenated.substring(i, i + 13);
+            if ((candidate.startsWith('978') || candidate.startsWith('979')) && this.validateISBN13(candidate)) {
+                console.log('Found ISBN-13 in concatenated numbers:', candidate);
+                return candidate;
+            }
+        }
+        
+        // Look for ISBN-10 in concatenated
+        for (let i = 0; i <= concatenated.length - 10; i++) {
+            const candidate = concatenated.substring(i, i + 10);
+            if (this.isValidISBN10(candidate)) {
+                console.log('Found ISBN-10 in concatenated numbers:', candidate);
+                return candidate;
+            }
+        }
+        
+        // Strategy 6: Handle completely mangled text - extract all digits and try combinations
+        const justDigits = normalizedText.replace(/[^\d]/g, '');
+        if (justDigits.length >= 13) {
+            // Sliding window for ISBN-13
+            for (let i = 0; i <= justDigits.length - 13; i++) {
+                const candidate = justDigits.substring(i, i + 13);
+                if ((candidate.startsWith('978') || candidate.startsWith('979')) && this.validateISBN13(candidate)) {
+                    console.log('Found ISBN-13 via sliding window:', candidate);
+                    return candidate;
+                }
+            }
+        }
+        
+        console.log('No valid ISBN found in text');
         return null;
     }
 
