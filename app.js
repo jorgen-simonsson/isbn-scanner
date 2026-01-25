@@ -15,13 +15,16 @@ const BookAPIs = {
             const data = await response.json();
             
             if (data.items && data.items.length > 0) {
-                // Find the Print item (the actual book record)
-                const printItem = data.items.find(item => item['@type'] === 'Print');
-                if (printItem) {
+                // Find a book item (Print, Electronic, or first item)
+                const bookItem = data.items.find(item => 
+                    item['@type'] === 'Print' || item['@type'] === 'Electronic'
+                ) || data.items[0];
+                
+                if (bookItem) {
                     // Extract title
                     let title = '';
-                    if (printItem.hasTitle && printItem.hasTitle.length > 0) {
-                        const titleObj = printItem.hasTitle[0];
+                    if (bookItem.hasTitle && bookItem.hasTitle.length > 0) {
+                        const titleObj = bookItem.hasTitle[0];
                         title = titleObj.mainTitle || '';
                         if (titleObj.hasPart && titleObj.hasPart.length > 0) {
                             const part = titleObj.hasPart[0];
@@ -30,49 +33,73 @@ const BookAPIs = {
                         }
                     }
                     
-                    // Extract authors from contribution
-                    let authors;
-                    if (printItem.contribution && printItem.contribution.length > 0) {
-                        authors = printItem.contribution
-                            .filter(c => c.agent && c.agent.name)
-                            .map(c => c.agent.name);
+                    // Helper function to extract author name from agent
+                    const getAgentName = (agent) => {
+                        if (!agent) return null;
+                        if (agent.name) return agent.name;
+                        // Handle Person with familyName/givenName
+                        if (agent.familyName || agent.givenName) {
+                            const parts = [agent.givenName, agent.familyName].filter(Boolean);
+                            return parts.join(' ');
+                        }
+                        return null;
+                    };
+                    
+                    // Extract authors - check both direct contribution and instanceOf.contribution
+                    let authors = [];
+                    const contributions = bookItem.instanceOf?.contribution || bookItem.contribution || [];
+                    for (const contrib of contributions) {
+                        // Prioritize authors (PrimaryContribution or role=author)
+                        const isAuthor = contrib['@type'] === 'PrimaryContribution' ||
+                            contrib.role?.some(r => 
+                                r['@id']?.includes('author') || 
+                                r.code === 'aut'
+                            );
+                        if (isAuthor) {
+                            const name = getAgentName(contrib.agent);
+                            if (name) authors.push(name);
+                        }
+                    }
+                    // If no authors found with role, try responsibilityStatement
+                    if (authors.length === 0 && bookItem.responsibilityStatement) {
+                        authors = [bookItem.responsibilityStatement.split(',')[0].trim()];
                     }
                     
                     // Extract publisher and date
                     let publisher, publishedDate;
-                    if (printItem.publication && printItem.publication.length > 0) {
-                        const pub = printItem.publication[0];
-                        publisher = pub.agent?.label?.[0];
+                    if (bookItem.publication && bookItem.publication.length > 0) {
+                        const pub = bookItem.publication[0];
+                        publisher = pub.agent?.label?.[0] || pub.agent?.name;
                         publishedDate = pub.year || pub.date;
                     }
                     
                     // Extract page count
                     let pageCount;
-                    if (printItem.extent && printItem.extent.length > 0) {
-                        const extentLabel = printItem.extent[0].label;
+                    if (bookItem.extent && bookItem.extent.length > 0) {
+                        const extentLabel = bookItem.extent[0].label;
                         if (extentLabel) {
-                            const match = extentLabel.match(/(\d+)\s*s/i);
+                            const match = (Array.isArray(extentLabel) ? extentLabel[0] : extentLabel).match(/(\d+)\s*s/i);
                             if (match) pageCount = parseInt(match[1]);
                         }
                     }
                     
                     // Extract language
                     let language;
-                    if (printItem.instanceOf?.language && printItem.instanceOf.language.length > 0) {
-                        language = printItem.instanceOf.language[0].code;
+                    if (bookItem.instanceOf?.language && bookItem.instanceOf.language.length > 0) {
+                        language = bookItem.instanceOf.language[0].code;
                     }
                     
                     // Extract description/notes
                     let description;
-                    if (printItem.instanceOf?.hasNote && printItem.instanceOf.hasNote.length > 0) {
-                        description = printItem.instanceOf.hasNote[0].label?.[0];
+                    if (bookItem.instanceOf?.hasNote && bookItem.instanceOf.hasNote.length > 0) {
+                        description = bookItem.instanceOf.hasNote[0].label?.[0];
                     }
                     
                     return {
                         found: true,
                         book: {
                             title,
-                            authors: authors && authors.length > 0 ? authors : undefined,
+                            authors: authors.length > 0 ? authors : undefined,
                             publisher,
                             publishedDate,
                             pageCount,
