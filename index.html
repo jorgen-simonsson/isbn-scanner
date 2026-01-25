@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#4a90d9">
+    <meta name="description" content="Scan ISBN barcodes or text to look up book information">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="ISBN Scanner">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icons/icon-192.svg">
+    <title>ISBN Scanner</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app">
+        <header>
+            <h1>📚 ISBN Scanner</h1>
+            <p class="subtitle">Scan barcodes or ISBN text</p>
+        </header>
+
+        <main>
+            <div class="scanner-container">
+                <video id="video" playsinline autoplay></video>
+                <canvas id="canvas" class="hidden"></canvas>
+                <div class="scan-overlay">
+                    <div class="scan-frame"></div>
+                </div>
+                <div class="scanner-controls">
+                    <button id="captureBtn" class="btn btn-capture" title="Capture for OCR">
+                        📷 Capture Text
+                    </button>
+                </div>
+            </div>
+
+            <div class="mode-toggle">
+                <button id="barcodeMode" class="mode-btn active">Barcode Scan</button>
+                <button id="textMode" class="mode-btn">Text OCR</button>
+            </div>
+
+            <div class="manual-input">
+                <input type="text" id="isbnInput" placeholder="Or enter ISBN manually..." maxlength="17">
+                <button id="searchBtn" class="btn btn-search">Search</button>
+            </div>
+
+            <div id="status" class="status"></div>
+
+            <div id="results" class="results hidden">
+                <div class="book-card">
+                    <img id="bookCover" src="" alt="Book cover" class="book-cover">
+                    <div class="book-info">
+                        <h2 id="bookTitle"></h2>
+                        <p id="bookAuthors" class="authors"></p>
+                        <p id="bookPublisher" class="publisher"></p>
+                        <p id="bookDate" class="date"></p>
+                        <p id="bookISBN" class="isbn"></p>
+                        <p id="bookPages" class="pages"></p>
+                        <p id="bookDescription" class="description"></p>
+                    </div>
+                </div>
+            </div>
+
+            <div id="history" class="history">
+                <h3>Recent Scans</h3>
+                <div id="historyList" class="history-list"></div>
+            </div>
+        </main>
+
+        <footer>
+            <p>Powered by Google Books API</p>
+        </footer>
+    </div>
+
+    <!-- Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2@1.8.4/dist/quagga.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

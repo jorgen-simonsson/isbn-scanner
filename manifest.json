@@ -1,0 +1,62 @@
+{
+    "name": "ISBN Scanner",
+    "short_name": "ISBN Scan",
+    "description": "Scan ISBN barcodes or text to look up book information",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#f8f9fa",
+    "theme_color": "#4a90d9",
+    "orientation": "portrait",
+    "scope": "/",
+    "icons": [
+        {
+            "src": "icons/icon-72.svg",
+            "sizes": "72x72",
+            "type": "image/svg+xml",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "icons/icon-96.svg",
+            "sizes": "96x96",
+            "type": "image/svg+xml",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "icons/icon-128.svg",
+            "sizes": "128x128",
+            "type": "image/svg+xml",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "icons/icon-144.svg",
+            "sizes": "144x144",
+            "type": "image/svg+xml",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "icons/icon-152.svg",
+            "sizes": "152x152",
+            "type": "image/svg+xml",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "icons/icon-192.svg",
+            "sizes": "192x192",
+            "type": "image/svg+xml",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "icons/icon-384.svg",
+            "sizes": "384x384",
+            "type": "image/svg+xml",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "icons/icon-512.svg",
+            "sizes": "512x512",
+            "type": "image/svg+xml",
+            "purpose": "any maskable"
+        }
+    ],
+    "categories": ["books", "utilities"]
+}
