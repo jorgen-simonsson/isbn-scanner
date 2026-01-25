@@ -1,4 +1,4 @@
-const CACHE_NAME = 'isbn-scanner-v6';
+const CACHE_NAME = 'isbn-scanner-v7';
 const urlsToCache = [
     '/',
     '/index.html',

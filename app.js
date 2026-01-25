@@ -69,7 +69,10 @@ const BookAPIs = {
                     let publisher, publishedDate;
                     if (bookItem.publication && bookItem.publication.length > 0) {
                         const pub = bookItem.publication[0];
-                        publisher = pub.agent?.label?.[0] || pub.agent?.name;
+                        // agent.label can be a string or array
+                        const label = pub.agent?.label;
+                        publisher = Array.isArray(label) ? label[0] : label;
+                        if (!publisher) publisher = pub.agent?.name;
                         publishedDate = pub.year || pub.date;
                     }
                     
