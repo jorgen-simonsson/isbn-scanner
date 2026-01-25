@@ -26,10 +26,25 @@ class ISBNScanner {
     async init() {
         this.loadHistory();
         this.setupEventListeners();
-        await this.startCamera();
         
+        // Check for camera support
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            this.setStatus('Camera not supported on this device/browser', 'error');
+            return;
+        }
+        
+        // Check if running on HTTPS or localhost (required for camera)
+        const isSecure = location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+        if (!isSecure) {
+            this.setStatus('Camera requires HTTPS. Please use a secure connection.', 'error');
+            return;
+        }
+        
+        // Start in barcode mode - Quagga handles its own video
         if (this.currentMode === 'barcode') {
-            this.startBarcodeScanning();
+            await this.startBarcodeScanning();
+        } else {
+            await this.startCamera();
         }
         
         this.registerServiceWorker();
@@ -50,32 +65,53 @@ class ISBNScanner {
         try {
             this.setStatus('Starting camera...', 'loading');
             
+            // Stop any existing streams first
+            if (this.stream) {
+                this.stream.getTracks().forEach(track => track.stop());
+                this.stream = null;
+            }
+            
             const constraints = {
                 video: {
-                    facingMode: 'environment',
+                    facingMode: { ideal: 'environment' },
                     width: { ideal: 1280 },
                     height: { ideal: 720 }
-                }
+                },
+                audio: false
             };
             
             this.stream = await navigator.mediaDevices.getUserMedia(constraints);
             this.video.srcObject = this.stream;
-            await this.video.play();
+            this.video.style.display = 'block';
             
-            // Set canvas size to match video
-            this.video.addEventListener('loadedmetadata', () => {
-                this.canvas.width = this.video.videoWidth;
-                this.canvas.height = this.video.videoHeight;
+            // Wait for video to be ready
+            await new Promise((resolve, reject) => {
+                this.video.onloadedmetadata = () => {
+                    this.canvas.width = this.video.videoWidth;
+                    this.canvas.height = this.video.videoHeight;
+                    resolve();
+                };
+                this.video.onerror = reject;
+                setTimeout(() => resolve(), 5000); // Timeout fallback
             });
             
-            this.setStatus('Camera ready. Point at an ISBN barcode.', 'success');
+            await this.video.play();
+            this.setStatus('Camera ready. Tap "Capture Text" to scan ISBN.', 'success');
         } catch (error) {
             console.error('Camera error:', error);
-            this.setStatus('Camera access denied. Please allow camera access.', 'error');
+            let msg = 'Camera error: ' + error.message;
+            if (error.name === 'NotAllowedError') {
+                msg = 'Camera access denied. Please allow camera access in your browser settings and reload.';
+            } else if (error.name === 'NotFoundError') {
+                msg = 'No camera found on this device.';
+            }
+            this.setStatus(msg, 'error');
         }
     }
 
-    setMode(mode) {
+    async setMode(mode) {
+        if (this.currentMode === mode) return;
+        
         this.currentMode = mode;
         
         // Update UI
@@ -83,76 +119,117 @@ class ISBNScanner {
         this.textMode.classList.toggle('active', mode === 'text');
         this.captureBtn.classList.toggle('hidden', mode === 'barcode');
         
-        // Stop current scanning
+        // Stop current scanning/camera
+        await this.stopAllMedia();
+        
+        if (mode === 'barcode') {
+            await this.startBarcodeScanning();
+        } else {
+            await this.startCamera();
+        }
+    }
+    
+    async stopAllMedia() {
+        // Stop Quagga if running
         if (this.isScanning) {
-            Quagga.stop();
+            try {
+                Quagga.stop();
+            } catch (e) {
+                console.log('Quagga stop:', e);
+            }
             this.isScanning = false;
         }
         
-        if (mode === 'barcode') {
-            this.startBarcodeScanning();
-            this.setStatus('Point camera at ISBN barcode', 'success');
-        } else {
-            this.setStatus('Capture image with ISBN text visible', 'success');
+        // Stop direct camera stream
+        if (this.stream) {
+            this.stream.getTracks().forEach(track => track.stop());
+            this.stream = null;
         }
+        
+        // Clear video
+        this.video.srcObject = null;
+        this.video.style.display = 'block';
+        
+        // Remove any Quagga-created elements
+        const quaggaVideo = this.video.parentElement.querySelector('video:not(#video)');
+        if (quaggaVideo) quaggaVideo.remove();
+        const quaggaCanvas = this.video.parentElement.querySelectorAll('canvas');
+        quaggaCanvas.forEach(c => { if (c.id !== 'canvas') c.remove(); });
     }
 
-    startBarcodeScanning() {
+    async startBarcodeScanning() {
         if (this.isScanning) return;
         
-        Quagga.init({
-            inputStream: {
-                name: "Live",
-                type: "LiveStream",
-                target: this.video,
-                constraints: {
-                    facingMode: "environment"
+        this.setStatus('Starting barcode scanner...', 'loading');
+        
+        // Hide the original video element - Quagga creates its own
+        this.video.style.display = 'none';
+        
+        return new Promise((resolve) => {
+            Quagga.init({
+                inputStream: {
+                    name: "Live",
+                    type: "LiveStream",
+                    target: this.video.parentElement, // Target container, not video
+                    constraints: {
+                        facingMode: "environment",
+                        width: { min: 640, ideal: 1280, max: 1920 },
+                        height: { min: 480, ideal: 720, max: 1080 }
+                    }
+                },
+                decoder: {
+                    readers: [
+                        "ean_reader",
+                        "ean_8_reader",
+                        "code_128_reader"
+                    ],
+                    multiple: false
+                },
+                locate: true,
+                locator: {
+                    patchSize: "medium",
+                    halfSample: true
+                },
+                frequency: 10
+            }, (err) => {
+                if (err) {
+                    console.error('Quagga init error:', err);
+                    this.setStatus('Barcode scanner failed: ' + (err.message || err) + '. Try Text OCR mode.', 'error');
+                    this.video.style.display = 'block';
+                    resolve(false);
+                    return;
                 }
-            },
-            decoder: {
-                readers: [
-                    "ean_reader",
-                    "ean_8_reader",
-                    "code_128_reader"
-                ]
-            },
-            locate: true,
-            locator: {
-                patchSize: "medium",
-                halfSample: true
-            }
-        }, (err) => {
-            if (err) {
-                console.error('Quagga init error:', err);
-                return;
-            }
-            
-            Quagga.start();
-            this.isScanning = true;
-        });
+                
+                Quagga.start();
+                this.isScanning = true;
+                this.setStatus('Point camera at ISBN barcode', 'success');
+                resolve(true);
+            });
 
-        Quagga.onDetected((result) => {
-            if (this.scanCooldown) return;
-            
-            const code = result.codeResult.code;
-            
-            // Check if it's a valid ISBN (10 or 13 digits starting with 978 or 979)
-            if (this.isValidISBN(code)) {
-                this.scanCooldown = true;
-                this.lastScannedISBN = code;
+            Quagga.onDetected((result) => {
+                if (this.scanCooldown) return;
                 
-                // Vibrate on successful scan
-                if (navigator.vibrate) {
-                    navigator.vibrate(100);
+                const code = result.codeResult.code;
+                console.log('Barcode detected:', code);
+                
+                // Check if it's a valid ISBN (10 or 13 digits starting with 978 or 979)
+                if (this.isValidISBN(code)) {
+                    this.scanCooldown = true;
+                    this.lastScannedISBN = code;
+                    
+                    // Vibrate on successful scan
+                    if (navigator.vibrate) {
+                        navigator.vibrate(100);
+                    }
+                    
+                    this.lookupBook(code);
+                    
+                    // Reset cooldown after 2 seconds
+                    setTimeout(() => {
+                        this.scanCooldown = false;
+                    }, 2000);
                 }
-                
-                this.lookupBook(code);
-                
-                // Reset cooldown after 2 seconds
-                setTimeout(() => {
-                    this.scanCooldown = false;
-                }, 2000);
-            }
+            });
         });
     }
 
