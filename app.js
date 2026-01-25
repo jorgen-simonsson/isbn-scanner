@@ -1,4 +1,128 @@
+// ============================================
+// Book API Providers
+// ============================================
+
+const BookAPIs = {
+    // Google Books API
+    googleBooks: {
+        name: 'Google Books',
+        async search(isbn) {
+            const response = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}`);
+            const data = await response.json();
+            
+            if (data.totalItems > 0) {
+                const vol = data.items[0].volumeInfo;
+                return {
+                    found: true,
+                    book: {
+                        title: vol.title,
+                        authors: vol.authors,
+                        publisher: vol.publisher,
+                        publishedDate: vol.publishedDate,
+                        pageCount: vol.pageCount,
+                        description: vol.description,
+                        imageLinks: vol.imageLinks,
+                        categories: vol.categories,
+                        language: vol.language
+                    }
+                };
+            }
+            return { found: false };
+        }
+    },
+    
+    // Open Library API
+    openLibrary: {
+        name: 'Open Library',
+        async search(isbn) {
+            const response = await fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&format=json&jscmd=data`);
+            const data = await response.json();
+            
+            const bookData = data[`ISBN:${isbn}`];
+            if (bookData) {
+                return {
+                    found: true,
+                    book: {
+                        title: bookData.title,
+                        authors: bookData.authors?.map(a => a.name),
+                        publisher: bookData.publishers?.[0]?.name,
+                        publishedDate: bookData.publish_date,
+                        pageCount: bookData.number_of_pages,
+                        description: bookData.notes || bookData.excerpts?.[0]?.text,
+                        imageLinks: {
+                            thumbnail: bookData.cover?.medium || bookData.cover?.small,
+                            smallThumbnail: bookData.cover?.small
+                        },
+                        subjects: bookData.subjects?.map(s => s.name)
+                    }
+                };
+            }
+            return { found: false };
+        }
+    },
+    
+    // OpenBD (Japanese books)
+    openBD: {
+        name: 'OpenBD',
+        async search(isbn) {
+            const response = await fetch(`https://api.openbd.jp/v1/get?isbn=${isbn}`);
+            const data = await response.json();
+            
+            if (data && data[0]) {
+                const summary = data[0].summary;
+                const onix = data[0].onix;
+                return {
+                    found: true,
+                    book: {
+                        title: summary.title,
+                        authors: summary.author ? [summary.author] : undefined,
+                        publisher: summary.publisher,
+                        publishedDate: summary.pubdate,
+                        description: onix?.CollateralDetail?.TextContent?.[0]?.Text,
+                        imageLinks: {
+                            thumbnail: summary.cover
+                        }
+                    }
+                };
+            }
+            return { found: false };
+        }
+    }
+};
+
+// ============================================
+// API Search Configuration
+// ============================================
+
+const APIConfig = {
+    // Order in which APIs are tried (first match wins)
+    searchOrder: ['googleBooks', 'openLibrary', 'openBD'],
+    
+    // Get list of enabled APIs
+    getEnabledAPIs() {
+        return this.searchOrder.map(key => ({
+            key,
+            ...BookAPIs[key]
+        }));
+    },
+    
+    // Change the search order
+    setSearchOrder(order) {
+        this.searchOrder = order.filter(key => BookAPIs[key]);
+    },
+    
+    // Add a custom API provider
+    addProvider(key, provider) {
+        if (provider.name && typeof provider.search === 'function') {
+            BookAPIs[key] = provider;
+        }
+    }
+};
+
+// ============================================
 // ISBN Scanner PWA
+// ============================================
+
 class ISBNScanner {
     constructor() {
         this.video = document.getElementById('video');
@@ -472,51 +596,33 @@ class ISBNScanner {
         this.setStatus('<span class="spinner"></span>Looking up book...', 'loading');
         this.results.classList.add('hidden');
         
-        try {
-            // Try Google Books API
-            const response = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}`);
-            const data = await response.json();
-            
-            if (data.totalItems > 0) {
-                const book = data.items[0].volumeInfo;
-                this.displayBook(book, isbn);
-                this.saveToHistory(book, isbn);
-                this.setStatus('Book found!', 'success');
-            } else {
-                // Try Open Library as fallback
-                const olResponse = await fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&format=json&jscmd=data`);
-                const olData = await olResponse.json();
+        const apis = APIConfig.getEnabledAPIs();
+        
+        for (const api of apis) {
+            try {
+                console.log(`Trying ${api.name}...`);
+                this.setStatus(`<span class="spinner"></span>Searching ${api.name}...`, 'loading');
                 
-                if (olData[`ISBN:${isbn}`]) {
-                    const book = this.convertOpenLibraryFormat(olData[`ISBN:${isbn}`]);
-                    this.displayBook(book, isbn);
-                    this.saveToHistory(book, isbn);
-                    this.setStatus('Book found!', 'success');
-                } else {
-                    this.setStatus(`No book found for ISBN: ${isbn}`, 'error');
+                const result = await api.search(isbn);
+                
+                if (result.found) {
+                    console.log(`Found in ${api.name}:`, result.book);
+                    this.displayBook(result.book, isbn, api.name);
+                    this.saveToHistory(result.book, isbn);
+                    this.setStatus(`Book found via ${api.name}!`, 'success');
+                    return;
                 }
+            } catch (error) {
+                console.error(`${api.name} error:`, error);
+                // Continue to next API
             }
-        } catch (error) {
-            console.error('API error:', error);
-            this.setStatus('Error looking up book. Please try again.', 'error');
         }
+        
+        // No API found the book
+        this.setStatus(`No book found for ISBN: ${isbn}`, 'error');
     }
 
-    convertOpenLibraryFormat(olBook) {
-        return {
-            title: olBook.title,
-            authors: olBook.authors?.map(a => a.name),
-            publisher: olBook.publishers?.[0]?.name,
-            publishedDate: olBook.publish_date,
-            pageCount: olBook.number_of_pages,
-            description: olBook.notes,
-            imageLinks: {
-                thumbnail: olBook.cover?.medium || olBook.cover?.small
-            }
-        };
-    }
-
-    displayBook(book, isbn) {
+    displayBook(book, isbn, source = '') {
         document.getElementById('bookTitle').textContent = book.title || 'Unknown Title';
         document.getElementById('bookAuthors').textContent = book.authors?.join(', ') || 'Unknown Author';
         document.getElementById('bookPublisher').textContent = book.publisher ? `Publisher: ${book.publisher}` : '';
