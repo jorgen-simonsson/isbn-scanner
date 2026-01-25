@@ -3,6 +3,89 @@
 // ============================================
 
 const BookAPIs = {
+    // Libris (Swedish National Library)
+    libris: {
+        name: 'Libris (KB)',
+        async search(isbn) {
+            const response = await fetch(`https://libris.kb.se/find.jsonld?q=${isbn}&_limit=5`, {
+                headers: {
+                    'Accept': 'application/ld+json'
+                }
+            });
+            const data = await response.json();
+            
+            if (data.items && data.items.length > 0) {
+                // Find the Print item (the actual book record)
+                const printItem = data.items.find(item => item['@type'] === 'Print');
+                if (printItem) {
+                    // Extract title
+                    let title = '';
+                    if (printItem.hasTitle && printItem.hasTitle.length > 0) {
+                        const titleObj = printItem.hasTitle[0];
+                        title = titleObj.mainTitle || '';
+                        if (titleObj.hasPart && titleObj.hasPart.length > 0) {
+                            const part = titleObj.hasPart[0];
+                            if (part.partNumber) title += ' ' + part.partNumber.join(', ');
+                            if (part.partName) title += ': ' + part.partName.join(', ');
+                        }
+                    }
+                    
+                    // Extract authors from contribution
+                    let authors;
+                    if (printItem.contribution && printItem.contribution.length > 0) {
+                        authors = printItem.contribution
+                            .filter(c => c.agent && c.agent.name)
+                            .map(c => c.agent.name);
+                    }
+                    
+                    // Extract publisher and date
+                    let publisher, publishedDate;
+                    if (printItem.publication && printItem.publication.length > 0) {
+                        const pub = printItem.publication[0];
+                        publisher = pub.agent?.label?.[0];
+                        publishedDate = pub.year || pub.date;
+                    }
+                    
+                    // Extract page count
+                    let pageCount;
+                    if (printItem.extent && printItem.extent.length > 0) {
+                        const extentLabel = printItem.extent[0].label;
+                        if (extentLabel) {
+                            const match = extentLabel.match(/(\d+)\s*s/i);
+                            if (match) pageCount = parseInt(match[1]);
+                        }
+                    }
+                    
+                    // Extract language
+                    let language;
+                    if (printItem.instanceOf?.language && printItem.instanceOf.language.length > 0) {
+                        language = printItem.instanceOf.language[0].code;
+                    }
+                    
+                    // Extract description/notes
+                    let description;
+                    if (printItem.instanceOf?.hasNote && printItem.instanceOf.hasNote.length > 0) {
+                        description = printItem.instanceOf.hasNote[0].label?.[0];
+                    }
+                    
+                    return {
+                        found: true,
+                        book: {
+                            title,
+                            authors: authors && authors.length > 0 ? authors : undefined,
+                            publisher,
+                            publishedDate,
+                            pageCount,
+                            description,
+                            language
+                        }
+                    };
+                }
+            }
+            return { found: false };
+        }
+    },
+    
     // Google Books API
     googleBooks: {
         name: 'Google Books',
@@ -96,7 +179,7 @@ const BookAPIs = {
 
 const APIConfig = {
     // Order in which APIs are tried (first match wins)
-    searchOrder: ['googleBooks', 'openLibrary', 'openBD'],
+    searchOrder: ['libris', 'googleBooks', 'openLibrary', 'openBD'],
     
     // Get list of enabled APIs
     getEnabledAPIs() {
