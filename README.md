@@ -35,7 +35,20 @@ Book information is retrieved from multiple APIs in order (first successful matc
 - **Responsive Design** - Optimized for mobile devices
 - **Camera Access** - Native camera integration via WebRTC
 
-### 📖 Book Information Retrieved
+### � Install on iPhone
+
+To add the app to your iPhone home screen:
+
+1. Open **Safari** and navigate to the app URL
+2. Tap the **Share** button (square with arrow pointing up) at the bottom of the screen
+3. Scroll down and tap **"Add to Home Screen"**
+4. Give the app a name (or keep "ISBN Scanner") and tap **"Add"**
+
+The app will now appear on your home screen like a native app, with its own icon and full-screen experience.
+
+> **Note:** This only works in Safari. Other browsers on iOS (Chrome, Firefox) do not support adding PWAs to the home screen.
+
+### �📖 Book Information Retrieved
 
 - Title
 - Author(s)
