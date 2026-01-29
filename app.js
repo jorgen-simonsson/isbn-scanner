@@ -22,7 +22,22 @@ const LibraryAPI = {
         }
     },
     
-    async addBook(bookData) {
+    async getPlaces() {
+        try {
+            const response = await fetch(`${this.baseUrl}/api/places`);
+            if (response.ok) {
+                const places = await response.json();
+                return { success: true, places };
+            } else {
+                throw new Error(`Failed to fetch places: ${response.status}`);
+            }
+        } catch (error) {
+            console.error('Get places error:', error);
+            return { success: false, error: error.message, places: [] };
+        }
+    },
+    
+    async addBook(bookData, placeId = null) {
         try {
             const response = await fetch(`${this.baseUrl}/api/books`, {
                 method: 'POST',
@@ -36,7 +51,7 @@ const LibraryAPI = {
                     publisher: bookData.publisher || null,
                     publishedYear: bookData.publishedDate ? bookData.publishedDate.substring(0, 4) : null,
                     pagecount: bookData.pageCount || null,
-                    placeId: null,
+                    placeId: placeId,
                     apiInfo: JSON.stringify(bookData)
                 })
             });
@@ -860,13 +875,77 @@ class ISBNScanner {
             return;
         }
         
-        // Disable button and show loading state
-        addToLibraryBtn.disabled = true;
-        addToLibraryBtn.textContent = 'Adding...';
-        libraryStatus.textContent = 'Adding to library...';
-        libraryStatus.className = 'library-status checking';
+        // Show place selector modal
+        await this.showPlaceSelector();
+    }
+    
+    async showPlaceSelector() {
+        const modal = document.getElementById('placeSelectorModal');
+        const placeSelect = document.getElementById('placeSelect');
+        const placeLoading = document.getElementById('placeLoading');
+        const placeError = document.getElementById('placeError');
         
-        const result = await LibraryAPI.addBook(this.currentBookData);
+        // Reset and show modal
+        modal.classList.remove('hidden');
+        placeSelect.classList.add('hidden');
+        placeLoading.classList.remove('hidden');
+        placeError.classList.add('hidden');
+        placeSelect.innerHTML = '';
+        
+        // Fetch places
+        const result = await LibraryAPI.getPlaces();
+        placeLoading.classList.add('hidden');
+        
+        if (result.success && result.places.length > 0) {
+            // Add default option
+            const defaultOption = document.createElement('option');
+            defaultOption.value = '';
+            defaultOption.textContent = '-- Select a location --';
+            placeSelect.appendChild(defaultOption);
+            
+            // Add places
+            result.places.forEach(place => {
+                const option = document.createElement('option');
+                option.value = place.id;
+                option.textContent = place.descr;
+                placeSelect.appendChild(option);
+            });
+            
+            placeSelect.classList.remove('hidden');
+        } else if (result.places.length === 0) {
+            placeError.textContent = 'No locations found. Add locations in your library first.';
+            placeError.classList.remove('hidden');
+        } else {
+            placeError.textContent = result.error || 'Failed to load locations';
+            placeError.classList.remove('hidden');
+        }
+    }
+    
+    hidePlaceSelector() {
+        const modal = document.getElementById('placeSelectorModal');
+        modal.classList.add('hidden');
+    }
+    
+    async confirmAddToLibrary() {
+        const placeSelect = document.getElementById('placeSelect');
+        const addToLibraryBtn = document.getElementById('addToLibraryBtn');
+        const libraryStatus = document.getElementById('libraryStatus');
+        const confirmBtn = document.getElementById('confirmAddBtn');
+        
+        const selectedPlaceId = placeSelect.value ? parseInt(placeSelect.value) : null;
+        
+        // Disable confirm button and show loading
+        confirmBtn.disabled = true;
+        confirmBtn.textContent = 'Adding...';
+        
+        const result = await LibraryAPI.addBook(this.currentBookData, selectedPlaceId);
+        
+        // Hide modal
+        this.hidePlaceSelector();
+        
+        // Reset confirm button
+        confirmBtn.disabled = false;
+        confirmBtn.textContent = 'Add Book';
         
         if (result.success) {
             libraryStatus.textContent = '✓ Added to your library!';
@@ -938,6 +1017,21 @@ class ISBNScanner {
         const addToLibraryBtn = document.getElementById('addToLibraryBtn');
         if (addToLibraryBtn) {
             addToLibraryBtn.addEventListener('click', () => this.addToLibrary());
+        }
+        
+        // Setup modal buttons
+        const cancelAddBtn = document.getElementById('cancelAddBtn');
+        const confirmAddBtn = document.getElementById('confirmAddBtn');
+        const modalBackdrop = document.querySelector('.modal-backdrop');
+        
+        if (cancelAddBtn) {
+            cancelAddBtn.addEventListener('click', () => this.hidePlaceSelector());
+        }
+        if (confirmAddBtn) {
+            confirmAddBtn.addEventListener('click', () => this.confirmAddToLibrary());
+        }
+        if (modalBackdrop) {
+            modalBackdrop.addEventListener('click', () => this.hidePlaceSelector());
         }
     }
 

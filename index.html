@@ -76,6 +76,24 @@
         </footer>
     </div>
 
+    <!-- Place Selector Modal -->
+    <div id="placeSelectorModal" class="modal hidden">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content">
+            <h3>📍 Select Location</h3>
+            <p class="modal-subtitle">Where will this book be stored?</p>
+            <div id="placeLoading" class="place-loading">
+                <span class="spinner"></span> Loading locations...
+            </div>
+            <p id="placeError" class="place-error hidden"></p>
+            <select id="placeSelect" class="place-select hidden"></select>
+            <div class="modal-buttons">
+                <button id="cancelAddBtn" class="btn btn-cancel">Cancel</button>
+                <button id="confirmAddBtn" class="btn btn-confirm">Add Book</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Libraries -->
     <script src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2@1.8.4/dist/quagga.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
