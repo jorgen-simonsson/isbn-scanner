@@ -3,7 +3,7 @@
 // ============================================
 
 const LibraryAPI = {
-    baseUrl: 'http://sotehus-rugged:8080',
+    baseUrl: 'https://sotehus-rugged:8443',
     
     async checkBookExists(isbn) {
         try {
