@@ -1,4 +1,61 @@
 // ============================================
+// Local Library API
+// ============================================
+
+const LibraryAPI = {
+    baseUrl: 'http://sotehus-rugged:8080',
+    
+    async checkBookExists(isbn) {
+        try {
+            const response = await fetch(`${this.baseUrl}/api/books/isbn/${isbn}`);
+            if (response.ok) {
+                const book = await response.json();
+                return { exists: true, book };
+            } else if (response.status === 404) {
+                return { exists: false };
+            } else {
+                throw new Error(`Library API error: ${response.status}`);
+            }
+        } catch (error) {
+            console.error('Library check error:', error);
+            return { exists: false, error: error.message };
+        }
+    },
+    
+    async addBook(bookData) {
+        try {
+            const response = await fetch(`${this.baseUrl}/api/books`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    isbn: bookData.isbn,
+                    title: bookData.title || 'Unknown Title',
+                    author: bookData.authors?.join(', ') || 'Unknown Author',
+                    publisher: bookData.publisher || null,
+                    publishedYear: bookData.publishedDate ? bookData.publishedDate.substring(0, 4) : null,
+                    pagecount: bookData.pageCount || null,
+                    placeId: null,
+                    apiInfo: JSON.stringify(bookData)
+                })
+            });
+            
+            if (response.ok) {
+                const createdBook = await response.json();
+                return { success: true, book: createdBook };
+            } else {
+                const errorText = await response.text();
+                throw new Error(`Failed to add book: ${response.status} - ${errorText}`);
+            }
+        } catch (error) {
+            console.error('Library add error:', error);
+            return { success: false, error: error.message };
+        }
+    }
+};
+
+// ============================================
 // Book API Providers
 // ============================================
 
@@ -263,6 +320,7 @@ class ISBNScanner {
     async init() {
         this.loadHistory();
         this.setupEventListeners();
+        this.setupLibraryButton();
         
         // Check for camera support
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -735,7 +793,7 @@ class ISBNScanner {
         this.setStatus(`No book found for ISBN: ${isbn}`, 'error');
     }
 
-    displayBook(book, isbn, source = '') {
+    async displayBook(book, isbn, source = '') {
         document.getElementById('bookTitle').textContent = book.title || 'Unknown Title';
         document.getElementById('bookAuthors').textContent = book.authors?.join(', ') || 'Unknown Author';
         document.getElementById('bookPublisher').textContent = book.publisher ? `Publisher: ${book.publisher}` : '';
@@ -757,6 +815,74 @@ class ISBNScanner {
         
         this.results.classList.remove('hidden');
         this.results.scrollIntoView({ behavior: 'smooth' });
+        
+        // Check library and show add button
+        await this.checkLibraryAndShowButton(book, isbn);
+    }
+    
+    async checkLibraryAndShowButton(book, isbn) {
+        const libraryStatus = document.getElementById('libraryStatus');
+        const addToLibraryBtn = document.getElementById('addToLibraryBtn');
+        
+        // Reset state
+        libraryStatus.textContent = 'Checking library...';
+        libraryStatus.className = 'library-status checking';
+        addToLibraryBtn.classList.add('hidden');
+        
+        // Store current book data for adding later
+        this.currentBookData = { ...book, isbn };
+        
+        const result = await LibraryAPI.checkBookExists(isbn);
+        
+        if (result.exists) {
+            libraryStatus.textContent = '✓ Already in your library';
+            libraryStatus.className = 'library-status in-library';
+            addToLibraryBtn.classList.add('hidden');
+        } else {
+            if (result.error) {
+                libraryStatus.textContent = '⚠ Could not check library';
+                libraryStatus.className = 'library-status error';
+            } else {
+                libraryStatus.textContent = 'Not in your library';
+                libraryStatus.className = 'library-status not-in-library';
+            }
+            addToLibraryBtn.classList.remove('hidden');
+        }
+    }
+    
+    async addToLibrary() {
+        const addToLibraryBtn = document.getElementById('addToLibraryBtn');
+        const libraryStatus = document.getElementById('libraryStatus');
+        
+        if (!this.currentBookData) {
+            libraryStatus.textContent = 'No book data available';
+            libraryStatus.className = 'library-status error';
+            return;
+        }
+        
+        // Disable button and show loading state
+        addToLibraryBtn.disabled = true;
+        addToLibraryBtn.textContent = 'Adding...';
+        libraryStatus.textContent = 'Adding to library...';
+        libraryStatus.className = 'library-status checking';
+        
+        const result = await LibraryAPI.addBook(this.currentBookData);
+        
+        if (result.success) {
+            libraryStatus.textContent = '✓ Added to your library!';
+            libraryStatus.className = 'library-status in-library';
+            addToLibraryBtn.classList.add('hidden');
+            
+            // Vibrate on success
+            if (navigator.vibrate) {
+                navigator.vibrate([100, 50, 100]);
+            }
+        } else {
+            libraryStatus.textContent = `✗ Failed to add: ${result.error}`;
+            libraryStatus.className = 'library-status error';
+            addToLibraryBtn.disabled = false;
+            addToLibraryBtn.textContent = '📚 Add to Library';
+        }
     }
 
     saveToHistory(book, isbn) {
@@ -806,6 +932,13 @@ class ISBNScanner {
                 this.lookupBook(isbn);
             });
         });
+    }
+    
+    setupLibraryButton() {
+        const addToLibraryBtn = document.getElementById('addToLibraryBtn');
+        if (addToLibraryBtn) {
+            addToLibraryBtn.addEventListener('click', () => this.addToLibrary());
+        }
     }
 
     setStatus(message, type = '') {

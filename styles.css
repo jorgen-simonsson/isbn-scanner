@@ -414,3 +414,70 @@ footer {
     color: white;
     opacity: 0.7;
 }
+/* Library actions */
+.library-actions {
+    width: 100%;
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid #eee;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.library-status {
+    font-size: 0.9rem;
+    font-weight: 500;
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    text-align: center;
+}
+
+.library-status.checking {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.library-status.in-library {
+    background: #d4edda;
+    color: #155724;
+}
+
+.library-status.not-in-library {
+    background: #e2e3e5;
+    color: #383d41;
+}
+
+.library-status.error {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.btn-add-library {
+    background: var(--success);
+    color: white;
+    padding: 0.75rem 1.5rem;
+    font-size: 1rem;
+    border: none;
+    border-radius: 25px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 8px rgba(40, 167, 69, 0.3);
+}
+
+.btn-add-library:hover {
+    background: #218838;
+    transform: scale(1.02);
+}
+
+.btn-add-library:active {
+    transform: scale(0.98);
+}
+
+.btn-add-library:disabled {
+    background: var(--secondary);
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
