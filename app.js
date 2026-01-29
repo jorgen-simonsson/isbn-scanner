@@ -7,7 +7,10 @@ const LibraryAPI = {
     
     async checkBookExists(isbn) {
         try {
-            const response = await fetch(`${this.baseUrl}/api/books/isbn/${isbn}`);
+            const url = `${this.baseUrl}/api/books/isbn/${isbn}`;
+            console.log('Checking library:', url);
+            const response = await fetch(url);
+            console.log('Library response status:', response.status);
             if (response.ok) {
                 const book = await response.json();
                 return { exists: true, book };
