@@ -3,7 +3,7 @@
 // ============================================
 
 const LibraryAPI = {
-    baseUrl: 'https://sotehus-rugged.tail21137e.ts.net/api',
+    baseUrl: 'https://sotehus-rugged.tail21137e.ts.net',
     
     async checkBookExists(isbn) {
         try {
