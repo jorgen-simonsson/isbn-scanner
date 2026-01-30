@@ -200,8 +200,8 @@ export class ISBNScanner {
                     target: scannerContainer,
                     constraints: {
                         facingMode: "environment",
-                        width: { min: 640, ideal: 1280, max: 1920 },
-                        height: { min: 480, ideal: 720, max: 1080 }
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
                     }
                 },
                 decoder: {
@@ -228,6 +228,16 @@ export class ISBNScanner {
                 }
                 
                 console.log('Quagga initialized successfully');
+                
+                // Debug: Check what elements Quagga created
+                const quaggaVideo = scannerContainer.querySelector('video');
+                const quaggaCanvas = scannerContainer.querySelector('canvas');
+                console.log('Quagga video element:', quaggaVideo);
+                console.log('Quagga canvas element:', quaggaCanvas);
+                if (quaggaVideo) {
+                    console.log('Video readyState:', quaggaVideo.readyState);
+                    console.log('Video srcObject:', quaggaVideo.srcObject);
+                }
                 
                 // Set up the onDetected handler after successful init
                 Quagga.onDetected((result) => {

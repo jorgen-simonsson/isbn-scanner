@@ -87,25 +87,31 @@ main {
     position: absolute;
     top: 0;
     left: 0;
+    z-index: 1;
 }
 
 /* Quagga viewport container */
-.scanner-container .viewport {
-    position: absolute;
+.scanner-container > .viewport,
+.scanner-container > div:not(.scan-overlay):not(.scanner-controls) {
+    position: absolute !important;
     top: 0;
     left: 0;
-    width: 100%;
-    height: 100%;
+    width: 100% !important;
+    height: 100% !important;
+    z-index: 1;
 }
 
 .scanner-container .viewport video,
-.scanner-container .viewport canvas {
-    position: absolute;
+.scanner-container .viewport canvas,
+.scanner-container > video,
+.scanner-container .drawingBuffer {
+    position: absolute !important;
     top: 0;
     left: 0;
-    width: 100%;
-    height: 100%;
+    width: 100% !important;
+    height: 100% !important;
     object-fit: cover;
+    z-index: 1;
 }
 
 .scanner-container canvas {
@@ -114,6 +120,7 @@ main {
     left: 0;
     width: 100%;
     height: 100%;
+    z-index: 2;
 }
 
 .hidden {
@@ -128,6 +135,7 @@ main {
     bottom: 0;
     display: flex;
     align-items: center;
+    z-index: 10;
     justify-content: center;
     pointer-events: none;
 }
