@@ -28,6 +28,7 @@ export class ISBNScanner {
         this.lastScannedISBN = null;
         this.scanCooldown = false;
         this.currentBookData = null;
+        this.quaggaInitialized = false;
         
         this.init();
     }
@@ -171,10 +172,45 @@ export class ISBNScanner {
     async startBarcodeScanning() {
         if (this.isScanning) return;
         
+        // Check if Quagga is available
+        if (typeof Quagga === 'undefined') {
+            this.setStatus('Barcode scanner library not loaded. Try refreshing the page.', 'error');
+            return false;
+        }
+        
         this.setStatus('Starting barcode scanner...', 'loading');
         
         // Hide the original video element - Quagga creates its own
         this.video.style.display = 'none';
+        
+        // Set up the onDetected handler only once
+        if (!this.quaggaInitialized) {
+            Quagga.onDetected((result) => {
+                if (this.scanCooldown || !this.isScanning) return;
+                
+                const code = result.codeResult.code;
+                console.log('Barcode detected:', code);
+                
+                // Check if it's a valid ISBN (10 or 13 digits starting with 978 or 979)
+                if (isValidISBN(code)) {
+                    this.scanCooldown = true;
+                    this.lastScannedISBN = code;
+                    
+                    // Vibrate on successful scan
+                    if (navigator.vibrate) {
+                        navigator.vibrate(100);
+                    }
+                    
+                    this.lookupBook(code);
+                    
+                    // Reset cooldown after 2 seconds
+                    setTimeout(() => {
+                        this.scanCooldown = false;
+                    }, 2000);
+                }
+            });
+            this.quaggaInitialized = true;
+        }
         
         return new Promise((resolve) => {
             Quagga.init({
@@ -215,31 +251,6 @@ export class ISBNScanner {
                 this.isScanning = true;
                 this.setStatus('Point camera at ISBN barcode', 'success');
                 resolve(true);
-            });
-
-            Quagga.onDetected((result) => {
-                if (this.scanCooldown) return;
-                
-                const code = result.codeResult.code;
-                console.log('Barcode detected:', code);
-                
-                // Check if it's a valid ISBN (10 or 13 digits starting with 978 or 979)
-                if (isValidISBN(code)) {
-                    this.scanCooldown = true;
-                    this.lastScannedISBN = code;
-                    
-                    // Vibrate on successful scan
-                    if (navigator.vibrate) {
-                        navigator.vibrate(100);
-                    }
-                    
-                    this.lookupBook(code);
-                    
-                    // Reset cooldown after 2 seconds
-                    setTimeout(() => {
-                        this.scanCooldown = false;
-                    }, 2000);
-                }
             });
         });
     }
