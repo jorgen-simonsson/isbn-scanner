@@ -186,9 +186,6 @@ export class ISBNScanner {
         
         this.setStatus('Starting barcode scanner...', 'loading');
         
-        // Hide the original video element - Quagga creates its own
-        this.video.style.display = 'none';
-        
         const scannerContainer = this.video.parentElement;
         console.log('Starting Quagga, target container:', scannerContainer);
         
@@ -222,22 +219,14 @@ export class ISBNScanner {
                 if (err) {
                     console.error('Quagga init error:', err);
                     this.setStatus('Barcode scanner failed: ' + (err.message || err) + '. Try Text OCR mode.', 'error');
-                    this.video.style.display = 'block';
                     resolve(false);
                     return;
                 }
                 
                 console.log('Quagga initialized successfully');
                 
-                // Debug: Check what elements Quagga created
-                const quaggaVideo = scannerContainer.querySelector('video');
-                const quaggaCanvas = scannerContainer.querySelector('canvas');
-                console.log('Quagga video element:', quaggaVideo);
-                console.log('Quagga canvas element:', quaggaCanvas);
-                if (quaggaVideo) {
-                    console.log('Video readyState:', quaggaVideo.readyState);
-                    console.log('Video srcObject:', quaggaVideo.srcObject);
-                }
+                // Make sure the video element is visible (Quagga reuses it)
+                this.video.style.display = 'block';
                 
                 // Set up the onDetected handler after successful init
                 Quagga.onDetected((result) => {
