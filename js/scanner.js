@@ -145,11 +145,13 @@ export class ISBNScanner {
         // Stop Quagga if running
         if (this.isScanning) {
             try {
+                Quagga.offDetected();
                 Quagga.stop();
             } catch (e) {
                 console.log('Quagga stop:', e);
             }
             this.isScanning = false;
+            this.quaggaInitialized = false;
         }
         
         // Stop direct camera stream
@@ -162,11 +164,13 @@ export class ISBNScanner {
         this.video.srcObject = null;
         this.video.style.display = 'block';
         
-        // Remove any Quagga-created elements
+        // Remove any Quagga-created elements (viewport div, video, canvas)
+        const viewport = this.video.parentElement.querySelector('.viewport');
+        if (viewport) viewport.remove();
         const quaggaVideo = this.video.parentElement.querySelector('video:not(#video)');
         if (quaggaVideo) quaggaVideo.remove();
-        const quaggaCanvas = this.video.parentElement.querySelectorAll('canvas');
-        quaggaCanvas.forEach(c => { if (c.id !== 'canvas') c.remove(); });
+        const quaggaCanvas = this.video.parentElement.querySelectorAll('canvas:not(#canvas)');
+        quaggaCanvas.forEach(c => c.remove());
     }
 
     async startBarcodeScanning() {
@@ -183,41 +187,15 @@ export class ISBNScanner {
         // Hide the original video element - Quagga creates its own
         this.video.style.display = 'none';
         
-        // Set up the onDetected handler only once
-        if (!this.quaggaInitialized) {
-            Quagga.onDetected((result) => {
-                if (this.scanCooldown || !this.isScanning) return;
-                
-                const code = result.codeResult.code;
-                console.log('Barcode detected:', code);
-                
-                // Check if it's a valid ISBN (10 or 13 digits starting with 978 or 979)
-                if (isValidISBN(code)) {
-                    this.scanCooldown = true;
-                    this.lastScannedISBN = code;
-                    
-                    // Vibrate on successful scan
-                    if (navigator.vibrate) {
-                        navigator.vibrate(100);
-                    }
-                    
-                    this.lookupBook(code);
-                    
-                    // Reset cooldown after 2 seconds
-                    setTimeout(() => {
-                        this.scanCooldown = false;
-                    }, 2000);
-                }
-            });
-            this.quaggaInitialized = true;
-        }
+        const scannerContainer = this.video.parentElement;
+        console.log('Starting Quagga, target container:', scannerContainer);
         
         return new Promise((resolve) => {
             Quagga.init({
                 inputStream: {
                     name: "Live",
                     type: "LiveStream",
-                    target: this.video.parentElement, // Target container, not video
+                    target: scannerContainer,
                     constraints: {
                         facingMode: "environment",
                         width: { min: 640, ideal: 1280, max: 1920 },
@@ -247,8 +225,37 @@ export class ISBNScanner {
                     return;
                 }
                 
+                console.log('Quagga initialized successfully');
+                
+                // Set up the onDetected handler after successful init
+                Quagga.onDetected((result) => {
+                    if (this.scanCooldown || !this.isScanning) return;
+                    
+                    const code = result.codeResult.code;
+                    console.log('Barcode detected:', code);
+                    
+                    // Check if it's a valid ISBN (10 or 13 digits starting with 978 or 979)
+                    if (isValidISBN(code)) {
+                        this.scanCooldown = true;
+                        this.lastScannedISBN = code;
+                        
+                        // Vibrate on successful scan
+                        if (navigator.vibrate) {
+                            navigator.vibrate(100);
+                        }
+                        
+                        this.lookupBook(code);
+                        
+                        // Reset cooldown after 2 seconds
+                        setTimeout(() => {
+                            this.scanCooldown = false;
+                        }, 2000);
+                    }
+                });
+                
                 Quagga.start();
                 this.isScanning = true;
+                console.log('Quagga started');
                 this.setStatus('Point camera at ISBN barcode', 'success');
                 resolve(true);
             });
