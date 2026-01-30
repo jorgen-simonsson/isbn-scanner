@@ -2,6 +2,8 @@
 // ISBN Scanner PWA - Main Scanner Class
 // ============================================
 
+/* global Quagga, Tesseract */
+
 import { LibraryAPI } from './library-api.js';
 import { APIConfig } from './api-config.js';
 import { isValidISBN, isValidISBN10, extractISBN } from './isbn-utils.js';
