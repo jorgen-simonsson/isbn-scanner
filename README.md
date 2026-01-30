@@ -94,15 +94,18 @@ Recent scans are saved locally and displayed for quick reference.
 
 ```
 isbn-scanner/
-├── index.html          # Main HTML file
-├── styles.css          # Responsive styles
-├── app.js              # Application logic
-│   ├── BookAPIs        # API provider modules
-│   ├── APIConfig       # API configuration
-│   └── ISBNScanner     # Main scanner class
-├── sw.js               # Service worker
-├── manifest.json       # PWA manifest
-└── icons/              # App icons (SVG)
+├── index.html              # Main HTML file
+├── styles.css              # Responsive styles
+├── sw.js                   # Service worker
+├── manifest.json           # PWA manifest
+├── js/                     # JavaScript modules
+│   ├── app.js              # Entry point - imports and initializes
+│   ├── scanner.js          # Main ISBNScanner class (UI, camera, barcode/OCR)
+│   ├── library-api.js      # Local library API integration
+│   ├── book-apis.js        # Book API providers (Libris, Google, etc.)
+│   ├── api-config.js       # API search order configuration
+│   └── isbn-utils.js       # ISBN validation and extraction utilities
+└── icons/                  # App icons (SVG)
     ├── icon-72.svg
     ├── icon-96.svg
     ├── icon-128.svg
@@ -113,19 +116,34 @@ isbn-scanner/
     └── icon-512.svg
 ```
 
+### Module Overview
+
+| Module | Purpose |
+|--------|---------|
+| `js/app.js` | Entry point that imports all modules and initializes the app |
+| `js/scanner.js` | Main `ISBNScanner` class handling camera, UI, history, and PWA features |
+| `js/library-api.js` | `LibraryAPI` object for integration with local library backend |
+| `js/book-apis.js` | `BookAPIs` object with providers (Libris, Google Books, Open Library, OpenBD) |
+| `js/api-config.js` | `APIConfig` for managing API search order and adding custom providers |
+| `js/isbn-utils.js` | Pure functions for ISBN validation (`isValidISBN`, `validateISBN13`, `isValidISBN10`) and OCR text extraction (`extractISBN`) |
+
 ## Configuration
 
 ### Changing API Search Order
 
-The API search order can be modified in `app.js`:
+The API search order can be modified by importing `APIConfig`:
 
 ```javascript
+import { APIConfig } from './js/api-config.js';
+
 APIConfig.setSearchOrder(['googleBooks', 'libris', 'openLibrary', 'openBD']);
 ```
 
 ### Adding a Custom API Provider
 
 ```javascript
+import { APIConfig } from './js/api-config.js';
+
 APIConfig.addProvider('myAPI', {
     name: 'My Book API',
     async search(isbn) {
@@ -146,6 +164,26 @@ APIConfig.addProvider('myAPI', {
         return { found: false };
     }
 });
+```
+
+### Using ISBN Utilities Standalone
+
+The ISBN validation functions can be imported and used independently:
+
+```javascript
+import { isValidISBN, validateISBN13, isValidISBN10, extractISBN } from './js/isbn-utils.js';
+
+// Validate any ISBN (10 or 13)
+isValidISBN('978-0-13-468599-1');  // true
+
+// Validate ISBN-13 specifically
+validateISBN13('9780134685991');   // true
+
+// Validate ISBN-10 specifically  
+isValidISBN10('0-13-468599-X');    // true
+
+// Extract ISBN from OCR text
+const isbn = extractISBN('Some text ISBN: 978-0-13-468599-1 more text');
 ```
 
 ## Development

@@ -1,9 +1,15 @@
-const CACHE_NAME = 'isbn-scanner-v7';
+const CACHE_NAME = 'isbn-scanner-v9';
 const urlsToCache = [
     '/',
     '/index.html',
     '/styles.css',
-    '/app.js',
+    '/js/app.js',
+    '/js/scanner.js',
+    '/js/library-api.js',
+    '/js/book-apis.js',
+    '/js/api-config.js',
+    '/js/isbn-utils.js',
+    '/js/version.js',
     '/manifest.json',
     'https://cdn.jsdelivr.net/npm/@ericblade/quagga2@1.8.4/dist/quagga.min.js'
 ];
