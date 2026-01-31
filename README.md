@@ -100,11 +100,16 @@ isbn-scanner/
 ├── manifest.json           # PWA manifest
 ├── js/                     # JavaScript modules
 │   ├── app.js              # Entry point - imports and initializes
-│   ├── scanner.js          # Main ISBNScanner class (UI, camera, barcode/OCR)
+│   ├── scanner.js          # Main ISBNScanner class (camera, barcode/OCR scanning)
+│   ├── ui-manager.js       # UI status messages and version display
+│   ├── book-display.js     # Book info display and library place selection
+│   ├── history-manager.js  # Scan history persistence and display
+│   ├── pwa-manager.js      # Service worker and install prompt handling
 │   ├── library-api.js      # Local library API integration
 │   ├── book-apis.js        # Book API providers (Libris, Google, etc.)
 │   ├── api-config.js       # API search order configuration
-│   └── isbn-utils.js       # ISBN validation and extraction utilities
+│   ├── isbn-utils.js       # ISBN validation and extraction utilities
+│   └── version.js          # App version constant
 └── icons/                  # App icons (SVG)
     ├── icon-72.svg
     ├── icon-96.svg
@@ -121,11 +126,16 @@ isbn-scanner/
 | Module | Purpose |
 |--------|---------|
 | `js/app.js` | Entry point that imports all modules and initializes the app |
-| `js/scanner.js` | Main `ISBNScanner` class handling camera, UI, history, and PWA features |
+| `js/scanner.js` | Main `ISBNScanner` class handling camera initialization, barcode scanning (Quagga), and OCR (Tesseract) |
+| `js/ui-manager.js` | `UIManager` class for status messages and version display in the UI |
+| `js/book-display.js` | `BookDisplay` class for rendering book info, library status checks, and place selection modal with "last used place" memory |
+| `js/history-manager.js` | `HistoryManager` class for persisting scan history to localStorage and displaying history list |
+| `js/pwa-manager.js` | `PWAManager` class for service worker registration and handling the install prompt |
 | `js/library-api.js` | `LibraryAPI` object for integration with local library backend |
 | `js/book-apis.js` | `BookAPIs` object with providers (Libris, Google Books, Open Library, OpenBD) |
 | `js/api-config.js` | `APIConfig` for managing API search order and adding custom providers |
 | `js/isbn-utils.js` | Pure functions for ISBN validation (`isValidISBN`, `validateISBN13`, `isValidISBN10`) and OCR text extraction (`extractISBN`) |
+| `js/version.js` | Exports `VERSION` constant for app versioning |
 
 ## Configuration
 

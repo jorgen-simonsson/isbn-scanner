@@ -1,4 +1,4 @@
-const CACHE_NAME = 'isbn-scanner-v11';
+const CACHE_NAME = 'isbn-scanner-v12';
 const urlsToCache = [
     './',
     './index.html',
@@ -10,6 +10,10 @@ const urlsToCache = [
     './js/api-config.js',
     './js/isbn-utils.js',
     './js/version.js',
+    './js/ui-manager.js',
+    './js/book-display.js',
+    './js/history-manager.js',
+    './js/pwa-manager.js',
     './manifest.json'
 ];
 
