@@ -430,6 +430,9 @@ export class ISBNScanner {
         placeError.classList.add('hidden');
         placeSelect.innerHTML = '';
         
+        // Get last used place from localStorage
+        const lastUsedPlaceId = localStorage.getItem('lastUsedPlaceId');
+        
         // Fetch places
         const result = await LibraryAPI.getPlaces();
         placeLoading.classList.add('hidden');
@@ -446,6 +449,10 @@ export class ISBNScanner {
                 const option = document.createElement('option');
                 option.value = place.id;
                 option.textContent = place.descr;
+                // Pre-select last used place
+                if (lastUsedPlaceId && place.id.toString() === lastUsedPlaceId) {
+                    option.selected = true;
+                }
                 placeSelect.appendChild(option);
             });
             
@@ -471,6 +478,11 @@ export class ISBNScanner {
         const confirmBtn = document.getElementById('confirmAddBtn');
         
         const selectedPlaceId = placeSelect.value ? parseInt(placeSelect.value) : null;
+        
+        // Save selected place as last used for next time
+        if (selectedPlaceId) {
+            localStorage.setItem('lastUsedPlaceId', selectedPlaceId.toString());
+        }
         
         // Disable confirm button and show loading
         confirmBtn.disabled = true;
