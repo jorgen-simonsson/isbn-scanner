@@ -52,7 +52,11 @@ export const LibraryAPI = {
                     title: bookData.title || 'Unknown Title',
                     author: bookData.authors?.join(', ') || 'Unknown Author',
                     publisher: bookData.publisher || null,
-                    publishedYear: bookData.publishedDate ? bookData.publishedDate.substring(0, 4) : null,
+                    publishedYear: (() => {
+                        if (!bookData.publishedDate) return null;
+                        const match = bookData.publishedDate.match(/\b(\d{4})\b/);
+                        return match ? match[1] : '0000';
+                    })(),
                     pagecount: bookData.pageCount || null,
                     placeId: placeId,
                     apiInfo: JSON.stringify(bookData)

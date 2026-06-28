@@ -144,12 +144,16 @@ export class BookDisplay {
         const confirmBtn = document.getElementById('confirmAddBtn');
         
         const selectedPlaceId = placeSelect.value ? parseInt(placeSelect.value) : null;
-        
-        // Save selected place as last used for next time
-        if (selectedPlaceId) {
-            localStorage.setItem('lastUsedPlaceId', selectedPlaceId.toString());
+
+        if (!selectedPlaceId) {
+            placeSelect.setCustomValidity('Please select a location');
+            placeSelect.reportValidity();
+            return;
         }
-        
+        placeSelect.setCustomValidity('');
+
+        localStorage.setItem('lastUsedPlaceId', selectedPlaceId.toString());
+
         // Disable confirm button and show loading
         confirmBtn.disabled = true;
         confirmBtn.textContent = 'Adding...';
