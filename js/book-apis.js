@@ -13,89 +13,107 @@ export const BookAPIs = {
                 }
             });
             const data = await response.json();
-            
+
             if (data.items && data.items.length > 0) {
-                // Find a book item (Print, Electronic, or first item)
-                const bookItem = data.items.find(item => 
-                    item['@type'] === 'Print' || item['@type'] === 'Electronic'
-                ) || data.items[0];
-                
-                if (bookItem) {
-                    // Extract title
+                const rawItem = data.items[0];
+
+                // Search returns Item records (physical holdings); book data is in itemOf
+                const instance = [].concat(rawItem['@type']).includes('Item') && rawItem.itemOf
+                    ? rawItem.itemOf
+                    : rawItem;
+
+                // Resolve agent name — may require a fetch if only @id is present
+                const resolveAgentName = async (agent) => {
+                    if (!agent) return null;
+                    if (agent.name) return agent.name;
+                    if (agent.familyName || agent.givenName) {
+                        return [agent.givenName, agent.familyName].filter(Boolean).join(' ');
+                    }
+                    if (agent['@id']) {
+                        try {
+                            const url = agent['@id'].replace(/#.*$/, '/data.jsonld');
+                            const resp = await fetch(url, { headers: { 'Accept': 'application/ld+json' } });
+                            const agentData = await resp.json();
+                            const graph = agentData['@graph'] || [];
+                            const person = graph.find(e => e['@id'] === agent['@id']) || agentData;
+                            if (person.name) return person.name;
+                            if (person.familyName || person.givenName) {
+                                return [person.givenName, person.familyName].filter(Boolean).join(' ');
+                            }
+                        } catch (e) { console.log('Agent fetch error:', e); }
+                    }
+                    return null;
+                };
+
+                if (instance) {
+                    // Title
+                    const titleSource = instance.hasTitle?.length ? instance : instance.instanceOf;
                     let title = '';
-                    if (bookItem.hasTitle && bookItem.hasTitle.length > 0) {
-                        const titleObj = bookItem.hasTitle[0];
+                    if (titleSource?.hasTitle?.length) {
+                        const titleObj = titleSource.hasTitle[0];
                         title = titleObj.mainTitle || '';
-                        if (titleObj.hasPart && titleObj.hasPart.length > 0) {
+                        if (titleObj.hasPart?.length) {
                             const part = titleObj.hasPart[0];
-                            if (part.partNumber) title += ' ' + part.partNumber.join(', ');
-                            if (part.partName) title += ': ' + part.partName.join(', ');
+                            if (part.partNumber) title += ' ' + [].concat(part.partNumber).join(', ');
+                            if (part.partName) title += ': ' + [].concat(part.partName).join(', ');
                         }
                     }
-                    
-                    // Helper function to extract author name from agent
-                    const getAgentName = (agent) => {
-                        if (!agent) return null;
-                        if (agent.name) return agent.name;
-                        // Handle Person with familyName/givenName
-                        if (agent.familyName || agent.givenName) {
-                            const parts = [agent.givenName, agent.familyName].filter(Boolean);
-                            return parts.join(' ');
-                        }
-                        return null;
-                    };
-                    
-                    // Extract authors - check both direct contribution and instanceOf.contribution
+
+                    // Authors — fetch agent records if names aren't inline
+                    const contributions = [
+                        ...(instance.instanceOf?.contribution || []),
+                        ...(instance.contribution || [])
+                    ];
                     let authors = [];
-                    const contributions = bookItem.instanceOf?.contribution || bookItem.contribution || [];
                     for (const contrib of contributions) {
-                        // Prioritize authors (PrimaryContribution or role=author)
-                        const isAuthor = contrib['@type'] === 'PrimaryContribution' ||
-                            contrib.role?.some(r => 
-                                r['@id']?.includes('author') || 
-                                r.code === 'aut'
-                            );
+                        const types = [].concat(contrib['@type'] || []);
+                        const isAuthor = types.includes('PrimaryContribution') ||
+                            contrib.role?.some(r => r['@id']?.includes('author') || r.code === 'aut');
                         if (isAuthor) {
-                            const name = getAgentName(contrib.agent);
+                            const name = await resolveAgentName(contrib.agent);
                             if (name) authors.push(name);
                         }
                     }
-                    // If no authors found with role, try responsibilityStatement
-                    if (authors.length === 0 && bookItem.responsibilityStatement) {
-                        authors = [bookItem.responsibilityStatement.split(',')[0].trim()];
+                    if (authors.length === 0) {
+                        for (const contrib of contributions) {
+                            const name = await resolveAgentName(contrib.agent);
+                            if (name) { authors.push(name); break; }
+                        }
+                    }
+                    if (authors.length === 0 && instance.responsibilityStatement) {
+                        authors = [instance.responsibilityStatement.split(',')[0].trim()];
                     }
                     
-                    // Extract publisher and date
+                    // Publisher and date
                     let publisher, publishedDate;
-                    if (bookItem.publication && bookItem.publication.length > 0) {
-                        const pub = bookItem.publication[0];
-                        // agent.label can be a string or array
+                    if (instance.publication?.length) {
+                        const pub = instance.publication[0];
                         const label = pub.agent?.label;
                         publisher = Array.isArray(label) ? label[0] : label;
                         if (!publisher) publisher = pub.agent?.name;
                         publishedDate = pub.year || pub.date;
                     }
-                    
-                    // Extract page count
+
+                    // Page count
                     let pageCount;
-                    if (bookItem.extent && bookItem.extent.length > 0) {
-                        const extentLabel = bookItem.extent[0].label;
+                    if (instance.extent?.length) {
+                        const extentLabel = instance.extent[0].label;
                         if (extentLabel) {
                             const match = (Array.isArray(extentLabel) ? extentLabel[0] : extentLabel).match(/(\d+)\s*s/i);
                             if (match) pageCount = parseInt(match[1]);
                         }
                     }
-                    
-                    // Extract language
+
+                    // Language
                     let language;
-                    if (bookItem.instanceOf?.language && bookItem.instanceOf.language.length > 0) {
-                        language = bookItem.instanceOf.language[0].code;
+                    if (instance.instanceOf?.language?.length) {
+                        language = instance.instanceOf.language[0].code;
                     }
-                    
-                    // Extract description/notes
+
+                    // Description
                     let description;
-                    if (bookItem.instanceOf?.hasNote && bookItem.instanceOf.hasNote.length > 0) {
-                        description = bookItem.instanceOf.hasNote[0].label?.[0];
+                    if (instance.instanceOf?.hasNote?.length) {
+                        description = instance.instanceOf.hasNote[0].label?.[0];
                     }
                     
                     return {
