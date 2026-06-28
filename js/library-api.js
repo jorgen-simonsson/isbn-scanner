@@ -57,7 +57,7 @@ export const LibraryAPI = {
                         const match = String(bookData.publishedDate).match(/(\d{4})/);
                         return match ? match[1] : '0000';
                     })(),
-                    pagecount: bookData.pageCount || null,
+                    pagecount: bookData.pageCount || undefined,
                     placeId: placeId,
                     apiInfo: JSON.stringify(bookData)
                 })
